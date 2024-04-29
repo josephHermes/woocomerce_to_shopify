@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convertir archivo de WooCommerce a Shopify</title>
+</head>
+<body>
+<input type="file" id="fileInput" accept=".xlsx">
+<button onclick="convertirArchivo()">Convertir</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.3/xlsx.full.min.js"></script>
+<script>
+// Función para procesar el contenido del archivo Excel y crear un archivo CSV para Shopify
+function procesarArchivoExcel(archivo) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const contenido = event.target.result;
+        const workbook = XLSX.read(contenido, { type: 'binary' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(sheet);
+
+        // Procesar los datos y crear el archivo CSV para Shopify
+        const productosShopify = procesarDatos(data);
+        crearArchivoCSV(productosShopify);
+    };
+    reader.readAsBinaryString(archivo);
+}
+
+// Función para procesar los datos del archivo Excel y devolver un arreglo de productos para Shopify
+function procesarDatos(data) {
+    const productosShopify = [];
+
+    //console.log(data, 'dataa')
+    data.forEach(row => {
+        const id = row['id'];
+        const sku = row['SKU'];
+        const nombre = row['Nombre'];
+        const publicado = row['Publicado'];
+        const visibilidad = row['visibilidad'];
+        const descripcion = row['descripcion_corta'];
+        const precio = row['Precio_normal'];
+        const peso = Math.round(row['Peso_(kg)'] * 1000);
+        const categorias = row['categorias'].split('>').flatMap(c => c.trim().split(',').map(c => c.replace(/^"|"$/g, '').trim()));
+        const etiquetas = row['Etiquetas'].split(',').map(e => e.replace(/^"|"$/g, '').trim());
+        const imagenes = row['imágenes'].split(',').map(url => { return { "src": url.trim().replace(/^"|"$/g, '') }; });
+
+        const productoShopify = {
+            "id": id,
+            "title": nombre,
+            "body_html": descripcion,
+            "tags": etiquetas,
+            "peso": peso,
+            "product_type": categorias[0],
+            "variants": [
+                {
+                    "sku": sku,
+                    "price": precio,
+                    "inventory_management": "shopify",
+                    "inventory_policy": "continue",
+                    "fulfillment_service": "manual",
+                    "inventory_quantity": 0,
+                    "option1": "Default Title"
+                }
+            ],
+            "images": imagenes,
+            "published": (publicado === 1),
+            "published_scope": visibilidad.toLowerCase()
+        };
+
+        if (categorias.length > 0) {
+            productoShopify.tags = productoShopify.tags.concat(categorias);
+        }
+
+        productosShopify.push(productoShopify);
+    });
+
+    return productosShopify;
+}
+
+// Función para crear un archivo CSV para Shopify y descargarlo
+function crearArchivoCSV(productos) {
+
+  // Encabezados del archivo CSV
+  const csvEncabezados = [
+    "Handle",
+    "Title",
+    "Body (HTML)",
+    "Vendor",
+    "Product Category",
+    "Type",
+    "Tags",
+    "Published",
+    "Option1 Name",
+    "Option1 Value",
+    "Option2 Name",
+    "Option2 Value",
+    "Option3 Name",
+    "Option3 Value",
+    "Variant SKU",
+    "Variant Grams",
+    "Variant Inventory Tracker",
+    "Variant Inventory Qty",
+    "Variant Inventory Policy",
+    "Variant Fulfillment Service",
+    "Variant Price",
+    "Variant Compare At Price",
+    "Variant Requires Shipping",
+    "Variant Taxable",
+    "Variant Barcode",
+    "Image Src",
+    "Image Alt Text",
+    "Gift Card",
+    "SEO Title",
+    "SEO Description",
+    "Google Shopping / Google Product Category",
+    "Google Shopping / Gender",
+    "Google Shopping / Age Group",
+    "Google Shopping / MPN",
+    "Google Shopping / AdWords Grouping",
+    "Google Shopping / AdWords Labels",
+    "Google Shopping / Condition",
+    "Google Shopping / Custom Product",
+    "Google Shopping / Custom Label 0",
+    "Google Shopping / Custom Label 1",
+    "Google Shopping / Custom Label 2",
+    "Google Shopping / Custom Label 3",
+    "Google Shopping / Custom Label 4",
+    "Variant Image",
+    "Variant Weight Unit",
+    "Variant Tax Code",
+    "Cost per item",
+    "Price / International",
+    "Compare At Price / International",
+    "Status"
+
+  ];
+
+  // Crear filas de datos CSV
+  const csvFilas = [];
+
+  productos.forEach(producto => {
+    const tituloSinComillas = producto.title.replace(/"/g, '');
+    const handle = tituloSinComillas.toLowerCase().replace(/\s+/g, '-'); // Crea el handle basado en el título del producto
+    const variant = producto.variants[0]; // Tomamos solo la primera variante para simplificar
+    
+    // Iterar sobre cada imagen del producto
+    producto.images.forEach((imagen, index) => {
+      console.log(index, 'index')
+      const fila = [
+        handle,
+        index === 0 ? producto.title : "",
+        index === 0 ? producto.body_html : "",
+        index === 0 ? "VIVEMODELISMO" : "",
+        index === 0 ? "MODELISMO" : "",
+        index === 0 ? producto.product_type : "",
+        index === 0 ? producto.tags.join(',') : "",
+        index === 0 ? producto.published : "",
+        index === 0 ? "title" : "",
+        index === 0 ? variant.option1 : "",
+        index === 0 ? "":"",
+        index === 0 ? "":"",
+        index === 0 ? "":"",
+        index === 0 ? "":"",
+        index === 0 ? variant.sku : "",
+        index === 0 ? producto.peso : "",
+        index === 0 ? "shopify" : "",
+        index === 0 ? variant.inventory_quantity : "",
+        index === 0 ? variant.inventory_policy : "",
+        index === 0 ? variant.fulfillment_service : "",
+        index === 0 ? variant.price : "",
+        index === 0 ? "" : "",
+        index === 0 ? "TRUE" : "",
+        index === 0 ? "TRUE" : "",
+        index === 0 ? "" : "",
+        imagen.src, // URL de la imagen
+        index === 0 ? "img alt" : "",
+        "",
+        index === 0 ? producto.title : "",
+        index === 0 ? producto.body_html : "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        index === 0 ? imagen.src :"",
+        index === 0 ? "g" : "",
+        "",
+        "",
+        "",
+        "",
+        index === 0 ? "active" : ""
+      ].map(valor => `"${valor}"`).join(','); // Agregar comillas y unir los valores con comas
+      
+      csvFilas.push(fila); // Agregar la fila al array de filas CSV
+    });
+  });
+
+  //console.log(csvFilas,'csvFilas')
+  // Unir encabezados y filas en una cadena CSV completa
+  const csvCompleto = [csvEncabezados.join(','), ...csvFilas].join('\n');
+
+  // Crear un objeto Blob con la cadena CSV
+  const blob = new Blob([csvCompleto], { type: 'text/csv' });
+
+  // Crear un enlace de descarga y hacer clic en él para descargar el archivo
+  const link = document.createElement('a');
+  link.href = window.URL.createObjectURL(blob);
+  link.download = 'productos_shopify.csv';
+  link.click();
+}
+
+// Función para manejar la conversión del archivo al hacer clic en el botón
+function convertirArchivo() {
+    const archivoInput = document.getElementById('fileInput');
+    const archivo = archivoInput.files[0];
+    if (archivo) {
+        procesarArchivoExcel(archivo);
+    } else {
+        alert('Por favor selecciona un archivo.');
+    }
+}
+</script>
+</body>
+</html>
